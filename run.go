@@ -21,14 +21,15 @@ import (
 
 // JobRunner provides the functionality needed to run jobs.
 type JobRunner struct {
-	client     JobUpdatePublisher
-	exit       chan messaging.StatusCode
-	job        *model.Job
-	status     messaging.StatusCode
-	cfg        *viper.Viper
-	logsDir    string
-	volumeDir  string
-	workingDir string
+	client      JobUpdatePublisher
+	exit        chan messaging.StatusCode
+	job         *model.Job
+	status      messaging.StatusCode
+	cfg         *viper.Viper
+	logsDir     string
+	volumeDir   string
+	workingDir  string
+	projectName string
 }
 
 // NewJobRunner creates a new JobRunner
@@ -135,7 +136,7 @@ func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
 		dataCommand := exec.Command(
 			composePath,
 			"-p",
-			r.job.InvocationID,
+			r.projectName,
 			"-f",
 			"docker-compose.yml",
 			"up",
@@ -174,7 +175,7 @@ func (r *JobRunner) downloadInputs() (messaging.StatusCode, error) {
 			log.Error(err)
 		}
 		defer stdout.Close()
-		downloadCommand := exec.Command(composePath, "-p", r.job.InvocationID, "-f", "docker-compose.yml", "up", "--no-color", fmt.Sprintf("input_%d", index))
+		downloadCommand := exec.Command(composePath, "-p", r.projectName, "-f", "docker-compose.yml", "up", "--no-color", fmt.Sprintf("input_%d", index))
 		downloadCommand.Env = env
 		downloadCommand.Stderr = stderr
 		downloadCommand.Stdout = stdout
@@ -229,7 +230,7 @@ func (r *JobRunner) runAllSteps() (messaging.StatusCode, error) {
 		defer stderr.Close()
 
 		composePath := r.cfg.GetString("docker-compose.path")
-		runCommand := exec.Command(composePath, "-p", r.job.InvocationID, "-f", "docker-compose.yml", "up", "--no-color", fmt.Sprintf("step_%d", idx))
+		runCommand := exec.Command(composePath, "-p", r.projectName, "-f", "docker-compose.yml", "up", "--no-color", fmt.Sprintf("step_%d", idx))
 		runCommand.Env = os.Environ()
 		runCommand.Stdout = stdout
 		runCommand.Stderr = stderr
@@ -274,7 +275,7 @@ func (r *JobRunner) uploadOutputs() (messaging.StatusCode, error) {
 		log.Error(err)
 	}
 	defer stderr.Close()
-	outputCommand := exec.Command(composePath, "-p", r.job.InvocationID, "-f", "docker-compose.yml", "up", "--no-color", "upload_outputs")
+	outputCommand := exec.Command(composePath, "-p", r.projectName, "-f", "docker-compose.yml", "up", "--no-color", "upload_outputs")
 	outputCommand.Env = []string{
 		fmt.Sprintf("VAULT_ADDR=%s", r.cfg.GetString("vault.url")),
 		fmt.Sprintf("VAULT_TOKEN=%s", r.cfg.GetString("vault.token")),
@@ -318,6 +319,8 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 		log.Error(err)
 	}
 
+	runner.projectName = strings.Replace(runner.job.InvocationID, "-", "", -1)
+
 	// let everyone know the job is running
 	running(runner.client, runner.job, fmt.Sprintf("Job %s is running on host %s", runner.job.InvocationID, host))
 
@@ -325,7 +328,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 		log.Error(err)
 	}
 
-	networkName := fmt.Sprintf("%s_default", runner.job.InvocationID)
+	networkName := fmt.Sprintf("%s_default", runner.projectName)
 	dockerPath := cfg.GetString("docker.path")
 	networkCreateCmd := exec.Command(dockerPath, "network", "create", "--driver", "bridge", networkName)
 	networkCreateCmd.Env = os.Environ()
@@ -338,7 +341,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	}
 
 	composePath := cfg.GetString("docker-compose.path")
-	pullCommand := exec.Command(composePath, "-p", runner.job.InvocationID, "-f", "docker-compose.yml", "pull", "--parallel")
+	pullCommand := exec.Command(composePath, "-p", runner.projectName, "-f", "docker-compose.yml", "pull", "--parallel")
 	pullCommand.Env = os.Environ()
 	pullCommand.Dir = runner.workingDir
 	pullCommand.Stdout = log.Writer()
