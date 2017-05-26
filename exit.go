@@ -2,6 +2,7 @@ package main
 
 import (
 	"os/exec"
+	"strings"
 
 	"github.com/cyverse-de/messaging"
 	"github.com/spf13/viper"
@@ -9,7 +10,8 @@ import (
 
 func cleanup(cfg *viper.Viper) {
 	var err error
-	downCommand := exec.Command(cfg.GetString("docker-compose.path"), "-f", "docker-compose.yml", "down", "--rmi", "all", "-v")
+	projName := strings.Replace(job.InvocationID, "-", "", -1) // dumb hack
+	downCommand := exec.Command(cfg.GetString("docker-compose.path"), "-p", projName, "-f", "docker-compose.yml", "down", "--rmi", "all", "-v")
 	downCommand.Stderr = log.Writer()
 	downCommand.Stdout = log.Writer()
 	if err = downCommand.Run(); err != nil {
