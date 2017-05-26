@@ -325,6 +325,18 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 		log.Error(err)
 	}
 
+	networkName := fmt.Sprintf("%s_default", runner.job.InvocationID)
+	dockerPath := cfg.GetString("docker.path")
+	networkCreateCmd := exec.Command(dockerPath, "network", "create", "--driver", "bridge", networkName)
+	networkCreateCmd.Env = os.Environ()
+	networkCreateCmd.Dir = runner.workingDir
+	networkCreateCmd.Stdout = log.Writer()
+	networkCreateCmd.Stderr = log.Writer()
+	err = networkCreateCmd.Run()
+	if err != nil {
+		log.Error(err) // don't need to fail, since docker-compose is *supposed* to create the network
+	}
+
 	composePath := cfg.GetString("docker-compose.path")
 	pullCommand := exec.Command(composePath, "-p", runner.job.InvocationID, "-f", "docker-compose.yml", "pull", "--parallel")
 	pullCommand.Env = os.Environ()
