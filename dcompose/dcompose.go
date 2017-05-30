@@ -196,9 +196,6 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 		Volumes: []string{
 			fmt.Sprintf("%s:%s:%s", job.InvocationID, WORKDIR, "rw"),
 		},
-		Networks: map[string]*ServiceNetworkConfig{
-			job.InvocationID: &ServiceNetworkConfig{},
-		},
 		Labels: map[string]string{
 			model.DockerLabelKey: job.InvocationID,
 			TypeLabel:            strconv.Itoa(OutputContainer),
