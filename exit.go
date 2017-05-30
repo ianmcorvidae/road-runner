@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
 
@@ -15,7 +16,14 @@ func cleanup(cfg *viper.Viper) {
 	downCommand.Stderr = log.Writer()
 	downCommand.Stdout = log.Writer()
 	if err = downCommand.Run(); err != nil {
-		log.Errorf("%+v", err)
+		log.Errorf("%+v\n", err)
+	}
+
+	netCmd := exec.Command(cfg.GetString("docker.path"), "network", "rm", fmt.Sprintf("%s_default", projName))
+	netCmd.Stderr = log.Writer()
+	netCmd.Stdout = log.Writer()
+	if err = netCmd.Run(); err != nil {
+		log.Errorf("%+v\n", err)
 	}
 }
 
