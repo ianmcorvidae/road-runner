@@ -7,6 +7,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -24,6 +25,7 @@ import (
 	"github.com/cyverse-de/road-runner/dcompose"
 	"github.com/cyverse-de/road-runner/fs"
 	"github.com/cyverse-de/version"
+	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
 
 	"github.com/spf13/viper"
@@ -44,6 +46,13 @@ var log = logrus.WithFields(logrus.Fields{
 
 func init() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
+}
+
+// CleanableJob is a job definition that contains extra information that allows
+// external tools to clean up after a job.
+type CleanableJob struct {
+	model.Job
+	LocalWorkingDir string `json:"local_working_directory"`
 }
 
 func main() {
@@ -120,18 +129,36 @@ func main() {
 	cfg.Set("docker.path", *dockerBin)
 	cfg.Set("docker.cfg", *dockerCfg)
 
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	data, err := ioutil.ReadFile(*jobFile)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	job, err = model.NewFromData(cfg, data)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	//create a cleanable version of the job.
+	cleanable := &CleanableJob{*job, wd}
+
+	cleanablejson, err := json.Marshal(cleanable)
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "failed to marshal json for job cleaning"))
+	}
+
+	// Check for the existence of the path at *writeTo
 	if _, err = os.Open(*writeTo); err != nil {
 		log.Fatal(err)
 	}
-	if err = fs.CopyJobFile(fs.FS, job.InvocationID, *jobFile, *writeTo); err != nil {
+
+	// Write out the cleanable job JSON to the *writeTo directory.
+	if err = fs.WriteJob(fs.FS, job.InvocationID, *writeTo, cleanablejson); err != nil {
 		log.Fatal(err)
 	}
 
@@ -144,11 +171,6 @@ func main() {
 	}
 	defer client.Close()
 	client.SetupPublishing(amqpExchangeName)
-
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// Generate the docker-compose file used to execute the job.
 	composer := dcompose.New()

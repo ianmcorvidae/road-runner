@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -53,6 +54,24 @@ func CopyJobFile(fs FileSystem, uuid, from, toDir string) error {
 	defer outputWriter.Close()
 	if _, err := io.Copy(outputWriter, inputReader); err != nil {
 		return errors.Wrapf(err, "failed to copy contents of %s to %s", from, toDir)
+	}
+	return nil
+}
+
+// WriteJob file write the contents of the file passed in to the file called
+// <uuid>.json inside the directory specified by toDir.
+func WriteJob(fs FileSystem, uuid, toDir string, content []byte) error {
+	outputFilePath := path.Join(toDir, fmt.Sprintf("%s.json", uuid))
+
+	outputWriter, err := fs.Create(outputFilePath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create path %s", outputFilePath)
+	}
+	defer outputWriter.Close()
+
+	buf := bytes.NewBuffer(content)
+	if _, err := io.Copy(outputWriter, buf); err != nil {
+		return errors.Wrapf(err, "failed to write content to %s", outputFilePath)
 	}
 	return nil
 }
