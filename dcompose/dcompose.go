@@ -70,7 +70,7 @@ type Service struct {
 	Command       []string          `yaml:",omitempty"`
 	ContainerName string            `yaml:"container_name,omitempty"`
 	CPUSet        string            `yaml:"cpuset,omitempty"`
-	CPUShares     string            `yaml:"cpu_shares,omitempty"`
+	CPUShares     int64             `yaml:"cpu_shares,omitempty"`
 	CPUQuota      string            `yaml:"cpu_quota,omitempty"`
 	DependsOn     []string          `yaml:"depends_on,omitempty"`
 	Devices       []string          `yaml:",omitempty"`
@@ -254,7 +254,7 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 	}
 
 	if stepContainer.CPUShares > 0 {
-		svc.CPUShares = strconv.FormatInt(stepContainer.CPUShares, 10)
+		svc.CPUShares = stepContainer.CPUShares
 	}
 
 	if stepContainer.NetworkMode != "" {
