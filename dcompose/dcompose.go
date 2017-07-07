@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/cyverse-de/model"
 	"github.com/spf13/viper"
@@ -258,7 +259,7 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 	}
 
 	if stepContainer.NetworkMode != "" {
-		svc.NetworkMode = stepContainer.NetworkMode
+		svc.NetworkMode = strings.ToLower(stepContainer.NetworkMode)
 	}
 
 	// Handles volumes created by other containers.
