@@ -235,13 +235,13 @@ func (r *JobRunner) runAllSteps() (messaging.StatusCode, error) {
 		if err != nil {
 			log.Error(err)
 		}
-		//defer stdout.Close()
+		defer stdout.Close()
 
 		stderr, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("condor-stderr-%d", idx)))
 		if err != nil {
 			log.Error(err)
 		}
-		//defer stderr.Close()
+		defer stderr.Close()
 
 		composePath := r.cfg.GetString("docker-compose.path")
 		svcname := fmt.Sprintf("step_%d", idx)
@@ -259,9 +259,6 @@ func (r *JobRunner) runAllSteps() (messaging.StatusCode, error) {
 		runCommand.Stdout = stdout
 		runCommand.Stderr = stderr
 		err = runCommand.Run()
-
-		stdout.Sync()
-		stderr.Sync()
 
 		if err != nil {
 			running(r.client, r.job,
