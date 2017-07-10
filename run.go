@@ -260,6 +260,9 @@ func (r *JobRunner) runAllSteps() (messaging.StatusCode, error) {
 		runCommand.Stderr = stderr
 		err = runCommand.Run()
 
+		stdout.Sync()
+		stderr.Sync()
+
 		if err != nil {
 			running(r.client, r.job,
 				fmt.Sprintf(
