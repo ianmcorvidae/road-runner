@@ -65,6 +65,7 @@ func main() {
 		composeBin  = flag.String("docker-compose-path", "/usr/bin/docker-compose", "The path to the docker-compose binary.")
 		dockerBin   = flag.String("docker-path", "/usr/bin/docker", "The path to the docker binary.")
 		dockerCfg   = flag.String("docker-cfg", "/var/lib/condor/.docker", "The path to the .docker directory.")
+		logdriver   = flag.String("log-driver", "de-logging", "The name of the Docker log driver to use in job steps.")
 		err         error
 		cfg         *viper.Viper
 	)
@@ -173,7 +174,10 @@ func main() {
 	client.SetupPublishing(amqpExchangeName)
 
 	// Generate the docker-compose file used to execute the job.
-	composer := dcompose.New()
+	composer, err := dcompose.New(*logdriver)
+	if err != nil {
+		log.Fatal(err)
+	}
 	composer.InitFromJob(job, cfg, wd)
 	c, err := os.Create(*composePath)
 	if err != nil {

@@ -2,11 +2,13 @@ package dcompose
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"strconv"
 	"strings"
 
 	"github.com/cyverse-de/model"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
@@ -39,6 +41,11 @@ const (
 	OutputContainer
 )
 
+var (
+	logdriver      string
+	hostworkingdir string
+)
+
 // Volume is a Docker volume definition in the Docker compose file.
 type Volume struct {
 	Driver  string
@@ -55,7 +62,7 @@ type Network struct {
 // LoggingConfig configures the logging for a docker-compose service.
 type LoggingConfig struct {
 	Driver  string
-	Options map[string]string `yaml:"driver_opts,omitempty"`
+	Options map[string]string `yaml:"options,omitempty"`
 }
 
 // ServiceNetworkConfig configures a docker-compose service to use a Docker
@@ -105,13 +112,21 @@ type JobCompose struct {
 }
 
 // New returns a newly instantiated *JobCompose instance.
-func New() *JobCompose {
+func New(ld string) (*JobCompose, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get host working directory")
+	}
+
+	logdriver = ld
+	hostworkingdir = path.Base(wd)
+
 	return &JobCompose{
 		Version:  "2",
 		Volumes:  make(map[string]*Volume),
 		Networks: make(map[string]*Network),
 		Services: make(map[string]*Service),
-	}
+	}, nil
 }
 
 // InitFromJob fills out values as appropriate for running in the DE's Condor
@@ -228,13 +243,20 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 	} else {
 		containername = fmt.Sprintf("step_%d_%s", index, invID)
 	}
-
+	indexstr := strconv.Itoa(index)
 	j.Services[fmt.Sprintf("step_%d", index)] = &Service{
 		Image:      imageName,
 		Command:    step.Arguments(),
 		WorkingDir: step.Component.Container.WorkingDirectory(),
 		Labels: map[string]string{
 			model.DockerLabelKey: strconv.Itoa(StepContainer),
+		},
+		Logging: &LoggingConfig{
+			Driver: logdriver,
+			Options: map[string]string{
+				"stderr": path.Join(hostworkingdir, VOLUMEDIR, step.Stderr(indexstr)),
+				"stdout": path.Join(hostworkingdir, VOLUMEDIR, step.Stdout(indexstr)),
+			},
 		},
 		ContainerName: containername,
 		Environment:   step.Environment,

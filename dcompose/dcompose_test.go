@@ -133,7 +133,7 @@ services:
       foo: bar
     logging:
       driver: syslog
-      driver_opts:
+      options:
         option1: value1
         option2: value2
     network_mode: bridge
@@ -329,7 +329,10 @@ services:
 }
 
 func TestNew(t *testing.T) {
-	jc := New()
+	jc, err := New("")
+	if err != nil {
+		t.Error(err)
+	}
 	if jc == nil {
 		t.Error("New() returned nil")
 	}
@@ -339,7 +342,10 @@ func TestNew(t *testing.T) {
 }
 
 func TestConvertStep(t *testing.T) {
-	jc := New()
+	jc, err := New("")
+	if err != nil {
+		t.Error(err)
+	}
 	jc.ConvertStep(&testJob.Steps[0], 0, testJob.Submitter, testJob.InvocationID)
 	if len(jc.Services) != 1 {
 		t.Errorf("number of services was %d and not 1", len(jc.Services))
