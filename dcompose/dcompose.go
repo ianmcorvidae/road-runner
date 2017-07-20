@@ -112,14 +112,17 @@ type JobCompose struct {
 }
 
 // New returns a newly instantiated *JobCompose instance.
-func New(ld string) (*JobCompose, error) {
+func New(ld string, pathprefix string) (*JobCompose, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get host working directory")
 	}
 
 	logdriver = ld
-	hostworkingdir = path.Base(wd)
+	hostworkingdir = strings.TrimPrefix(wd, pathprefix)
+	if strings.HasPrefix(hostworkingdir, "/") {
+		hostworkingdir = strings.TrimPrefix(hostworkingdir, "/")
+	}
 
 	return &JobCompose{
 		Version:  "2",

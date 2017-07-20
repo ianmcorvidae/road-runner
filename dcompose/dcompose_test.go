@@ -329,7 +329,7 @@ services:
 }
 
 func TestNew(t *testing.T) {
-	jc, err := New("")
+	jc, err := New("", "")
 	if err != nil {
 		t.Error(err)
 	}
@@ -342,7 +342,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestConvertStep(t *testing.T) {
-	jc, err := New("")
+	jc, err := New("", "")
 	if err != nil {
 		t.Error(err)
 	}
