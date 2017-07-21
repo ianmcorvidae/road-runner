@@ -138,17 +138,20 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Read in the job definition from the path passed in on the command-line
 	data, err := ioutil.ReadFile(*jobFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Intialize a job model from the data read from the job definition.
 	job, err = model.NewFromData(cfg, data)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	//create a cleanable version of the job.
+	// Create a cleanable version of the job. Adds a bit more data to allow
+	// image-janitor and network-pruner to do their work.
 	cleanable := &CleanableJob{*job, wd}
 
 	cleanablejson, err := json.Marshal(cleanable)
@@ -161,11 +164,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Write out the cleanable job JSON to the *writeTo directory.
+	// Write out the cleanable job JSON to the *writeTo directory. This will be
+	// where network-pruner and image-janitor read the job data from.
 	if err = fs.WriteJob(fs.FS, job.InvocationID, *writeTo, cleanablejson); err != nil {
 		log.Fatal(err)
 	}
 
+	// Configure and initialize the AMQP connection. It will be used to listen for
+	// stop requests and send out job status notifications.
 	uri := cfg.GetString("amqp.uri")
 	amqpExchangeName = cfg.GetString("amqp.exchange.name")
 	amqpExchangeType = cfg.GetString("amqp.exchange.type")
@@ -175,6 +181,8 @@ func main() {
 	}
 	defer client.Close()
 
+	// Configured the AMQP client so we can publish messages such as the job
+	// status updates.
 	client.SetupPublishing(amqpExchangeName)
 
 	// Generate the docker-compose file used to execute the job.
@@ -183,8 +191,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Populates the data structure that will become the docker-compose file with
+	// information from the job definition.
 	composer.InitFromJob(job, cfg, wd)
 
+	// Write out the docker-compose file. This will get transferred back with the
+	// job outputs, which makes debugging stuff a lot easier.
 	c, err := os.Create(*composePath)
 	if err != nil {
 		log.Fatal(err)
@@ -210,6 +222,9 @@ func main() {
 	// Launch the go routine that will handle job exits by signal or timer.
 	go Exit(cfg, exit, finalExit)
 
+	// Listen for stop requests. Make sure Listen() is called before the stop
+	// request message consumer is added, otherwise there's a race condition that
+	// might cause stop requests to disappear into the void.
 	go client.Listen()
 
 	client.AddDeletableConsumer(
@@ -224,13 +239,19 @@ func main() {
 		},
 	)
 
+	// Actually execute all of the job steps.
 	go Run(client, job, cfg, exit)
 
+	// Block waiting for the exit code, which will either come from the Run()
+	// goroutine or from Condor passing along a signal.
 	exitCode := <-finalExit
 
+	// Clean up the job file. Cleaning it out will prevent image-janitor and
+	// network-pruner from continuously trying to clean up after the job.
 	if err = fs.DeleteJobFile(fs.FS, job.InvocationID, *writeTo); err != nil {
 		log.Errorf("%+v", err)
 	}
 
+	// Exit with the status code of the job.
 	os.Exit(int(exitCode))
 }
