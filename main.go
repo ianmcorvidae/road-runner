@@ -70,7 +70,9 @@ func main() {
 		err         error
 		cfg         *viper.Viper
 	)
+
 	logcabin.Init("road-runner", "road-runner")
+
 	sigquitter := make(chan bool)
 	sighandler := InitSignalHandler()
 	sighandler.Receive(
@@ -172,6 +174,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer client.Close()
+
 	client.SetupPublishing(amqpExchangeName)
 
 	// Generate the docker-compose file used to execute the job.
@@ -179,12 +182,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	composer.InitFromJob(job, cfg, wd)
+
 	c, err := os.Create(*composePath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()
+
 	m, err := yaml.Marshal(composer)
 	if err != nil {
 		log.Fatal(err)
@@ -197,11 +203,15 @@ func main() {
 
 	// The channel that the exit code will be passed along on.
 	exit := make(chan messaging.StatusCode)
+
 	// Could probably reuse the exit channel, but that's less explicit.
 	finalExit := make(chan messaging.StatusCode)
+
 	// Launch the go routine that will handle job exits by signal or timer.
 	go Exit(cfg, exit, finalExit)
+
 	go client.Listen()
+
 	client.AddDeletableConsumer(
 		amqpExchangeName,
 		amqpExchangeType,
@@ -211,11 +221,16 @@ func main() {
 			d.Ack(false)
 			running(client, job, "Received stop request")
 			exit <- messaging.StatusKilled
-		})
+		},
+	)
+
 	go Run(client, job, cfg, exit)
+
 	exitCode := <-finalExit
+
 	if err = fs.DeleteJobFile(fs.FS, job.InvocationID, *writeTo); err != nil {
 		log.Errorf("%+v", err)
 	}
+
 	os.Exit(int(exitCode))
 }
