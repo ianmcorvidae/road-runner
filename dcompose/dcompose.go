@@ -307,7 +307,7 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 	svc.Volumes = append(svc.Volumes, fmt.Sprintf("%s:%s:rw", invID, stepContainer.WorkingDirectory()))
 
 	// The TMPDIR needs to be mounted as a volume
-	svc.Volumes = append(svc.Volumes, fmt.Sprintf("%s:/tmp:rw", TMPDIR))
+	svc.Volumes = append(svc.Volumes, fmt.Sprintf("./%s:/tmp:rw", TMPDIR))
 
 	for _, v := range stepContainer.Volumes {
 		var rw string
