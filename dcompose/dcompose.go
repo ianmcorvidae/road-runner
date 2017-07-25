@@ -24,6 +24,10 @@ const CONFIGDIR = "/configs"
 // volume.
 const VOLUMEDIR = "workingvolume"
 
+// TMPDIR is the name of the directory that will be mounted into the container
+// as the /tmp directory.
+const TMPDIR = "tmpfiles"
+
 const (
 	// TypeLabel is the label key applied to every container.
 	TypeLabel = "org.iplantc.containertype"
@@ -301,6 +305,9 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 
 	// The working directory needs to be mounted as a volume.
 	svc.Volumes = append(svc.Volumes, fmt.Sprintf("%s:%s:rw", invID, stepContainer.WorkingDirectory()))
+
+	// The TMPDIR needs to be mounted as a volume
+	svc.Volumes = append(svc.Volumes, fmt.Sprintf("%s:/tmp:rw", TMPDIR))
 
 	for _, v := range stepContainer.Volumes {
 		var rw string

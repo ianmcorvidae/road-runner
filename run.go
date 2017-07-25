@@ -30,6 +30,7 @@ type JobRunner struct {
 	volumeDir   string
 	workingDir  string
 	projectName string
+	tmpDir      string
 }
 
 // NewJobRunner creates a new JobRunner
@@ -47,6 +48,7 @@ func NewJobRunner(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, e
 		workingDir: cwd,
 		volumeDir:  path.Join(cwd, dcompose.VOLUMEDIR),
 		logsDir:    path.Join(cwd, dcompose.VOLUMEDIR, "logs"),
+		tmpDir:     path.Join(cwd, dcompose.TMPDIR),
 	}
 	return runner, nil
 }
@@ -55,6 +57,11 @@ func NewJobRunner(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, e
 // will get created.
 func (r *JobRunner) Init() error {
 	err := os.MkdirAll(r.logsDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(r.tmpDir, 0755)
 	if err != nil {
 		return err
 	}
