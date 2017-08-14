@@ -66,7 +66,7 @@ func main() {
 		dockerBin   = flag.String("docker-path", "/usr/bin/docker", "The path to the docker binary.")
 		dockerCfg   = flag.String("docker-cfg", "/var/lib/condor/.docker", "The path to the .docker directory.")
 		logdriver   = flag.String("log-driver", "de-logging", "The name of the Docker log driver to use in job steps.")
-		pathprefix  = flag.String("path-prefix", "/var/lib/condor/", "The path prefix for the stderr/stdout logs.")
+		pathprefix  = flag.String("path-prefix", "/var/lib/condor/execute", "The path prefix for the stderr/stdout logs.")
 		err         error
 		cfg         *viper.Viper
 	)
