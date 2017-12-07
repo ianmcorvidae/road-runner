@@ -180,7 +180,7 @@ func (r *JobRunner) downloadInputs() (messaging.StatusCode, error) {
 			log.Error(err)
 		}
 		defer stderr.Close()
-		stdout, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stderr-input-%d", index)))
+		stdout, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stdout-input-%d", index)))
 		if err != nil {
 			log.Error(err)
 		}
