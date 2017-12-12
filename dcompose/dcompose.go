@@ -100,6 +100,7 @@ type Service struct {
 	MemSwappiness string                           `yaml:"mem_swappiness,omitempty"`
 	NetworkMode   string                           `yaml:"network_mode,omitempty"`
 	Networks      map[string]*ServiceNetworkConfig `yaml:",omitempty"`
+	PIDsLimit     int64                            `yaml:"pids_limit,omitempty"`
 	Ports         []string                         `yaml:",omitempty"`
 	Volumes       []string                         `yaml:",omitempty"`
 	VolumesFrom   []string                         `yaml:"volumes_from,omitempty"`
@@ -129,7 +130,7 @@ func New(ld string, pathprefix string) (*JobCompose, error) {
 	}
 
 	return &JobCompose{
-		Version:  "2",
+		Version:  "2.1",
 		Volumes:  make(map[string]*Volume),
 		Networks: make(map[string]*Network),
 		Services: make(map[string]*Service),
@@ -285,6 +286,10 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 
 	if stepContainer.CPUShares > 0 {
 		svc.CPUShares = stepContainer.CPUShares
+	}
+
+	if stepContainer.PIDsLimit > 0 {
+		svc.PIDsLimit = stepContainer.PIDsLimit
 	}
 
 	if stepContainer.NetworkMode != "" {

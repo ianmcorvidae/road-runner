@@ -65,6 +65,7 @@ var testJob = &model.Job{
 					ID:        "container-id-1",
 					Name:      "container-name-1",
 					CPUShares: 0,
+					PIDsLimit: 64,
 					Image: model.ContainerImage{
 						ID:   "container-image-1",
 						Name: "container-image-name-1",
@@ -353,22 +354,28 @@ func TestConvertStep(t *testing.T) {
 	if _, ok := jc.Services["step_0"]; !ok {
 		t.Error("step_0 not found")
 	}
-	if _, ok := jc.Services["step_0"].Environment["FOO"]; !ok {
+
+	svc := jc.Services["step_0"]
+
+	if _, ok := svc.Environment["FOO"]; !ok {
 		t.Error("environment var FOO not found")
 	}
-	if jc.Services["step_0"].Environment["FOO"] != "BAR" {
-		t.Errorf("FOO value was %s instead of 'BAR'", jc.Services["step_0"].Environment["FOO"])
+	if svc.Environment["FOO"] != "BAR" {
+		t.Errorf("FOO value was %s instead of 'BAR'", svc.Environment["FOO"])
 	}
-	if _, ok := jc.Services["step_0"].Environment["BAZ"]; !ok {
+	if _, ok := svc.Environment["BAZ"]; !ok {
 		t.Error("environment var BAZ not found")
 	}
-	if jc.Services["step_0"].Environment["BAZ"] != "1" {
-		t.Errorf("BAZ value was %s instead of '1'", jc.Services["step_0"].Environment["BAZ"])
+	if svc.Environment["BAZ"] != "1" {
+		t.Errorf("BAZ value was %s instead of '1'", svc.Environment["BAZ"])
 	}
-	svc := jc.Services["step_0"]
 	if svc.Image != "container-image-name-1:container-image-tag-1" {
 		t.Errorf("image was %s", svc.Image)
 	}
+	if svc.PIDsLimit != 64 {
+		t.Errorf("PIDsLimit was %d, expecting 64", svc.PIDsLimit)
+	}
+
 	if !reflect.DeepEqual(svc.Command, []string{"step-param-name-1", "step-param-value-1", "step-param-name-2", "step-param-value-2"}) {
 		t.Errorf("command was %#v", svc.Command)
 	}
