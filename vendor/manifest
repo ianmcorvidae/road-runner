@@ -551,18 +551,18 @@
 			"notests": true
 		},
 		{
-			"importpath": "gopkg.in/cyverse-de/messaging.v2",
-			"repository": "https://gopkg.in/cyverse-de/messaging.v2",
+			"importpath": "gopkg.in/cyverse-de/messaging.v4",
+			"repository": "https://gopkg.in/cyverse-de/messaging.v4",
 			"vcs": "git",
-			"revision": "79fe2cf2fd16a8eb61e785e22fb4a8301bce5068",
+			"revision": "bef7609a2fe6e9418eeb36906929abee2298cf93",
 			"branch": "master",
 			"notests": true
 		},
 		{
-			"importpath": "gopkg.in/cyverse-de/model.v1",
-			"repository": "https://gopkg.in/cyverse-de/model.v1",
+			"importpath": "gopkg.in/cyverse-de/model.v2",
+			"repository": "https://gopkg.in/cyverse-de/model.v2",
 			"vcs": "git",
-			"revision": "3b06c9e9e248fcd8bcb1b660b3047908cb91c1ba",
+			"revision": "13e4871be4ea0864788e272d91fa5c60eb19ed4b",
 			"branch": "master",
 			"notests": true
 		},

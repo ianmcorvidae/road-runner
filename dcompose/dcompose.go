@@ -9,7 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"gopkg.in/cyverse-de/model.v1"
+	"gopkg.in/cyverse-de/model.v2"
 )
 
 // WORKDIR is the path to the working directory inside all of the containers
@@ -29,6 +29,8 @@ const VOLUMEDIR = "workingvolume"
 const TMPDIR = "tmpfiles"
 
 const (
+	UploadExcludesFilename string = "porklock-upload-exclusions.txt"
+
 	// TypeLabel is the label key applied to every container.
 	TypeLabel = "org.iplantc.containertype"
 
@@ -207,10 +209,13 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 	}
 
 	// Add the final output job
+	excludesPath := path.Join(workingdir, UploadExcludesFilename)
+	excludesMount := path.Join(CONFIGDIR, UploadExcludesFilename)
+
 	j.Services["upload_outputs"] = &Service{
 		CapAdd:  []string{"IPC_LOCK"},
 		Image:   porklockImageName,
-		Command: job.FinalOutputArguments(),
+		Command: job.FinalOutputArguments(excludesMount),
 		Environment: map[string]string{
 			"VAULT_ADDR":  "${VAULT_ADDR}",
 			"VAULT_TOKEN": "${VAULT_TOKEN}",
@@ -218,7 +223,8 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 		},
 		WorkingDir: WORKDIR,
 		Volumes: []string{
-			fmt.Sprintf("%s:%s:%s", job.InvocationID, WORKDIR, "rw"),
+			strings.Join([]string{job.InvocationID, WORKDIR, "rw"}, ":"),
+			strings.Join([]string{excludesPath, excludesMount, "ro"}, ":"),
 		},
 		Labels: map[string]string{
 			model.DockerLabelKey: job.InvocationID,
