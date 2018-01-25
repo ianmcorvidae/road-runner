@@ -15,8 +15,8 @@ import (
 	"github.com/kr/pty"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"gopkg.in/cyverse-de/messaging.v2"
-	"gopkg.in/cyverse-de/model.v1"
+	"gopkg.in/cyverse-de/messaging.v4"
+	"gopkg.in/cyverse-de/model.v2"
 )
 
 // JobRunner provides the functionality needed to run jobs.
@@ -66,9 +66,18 @@ func (r *JobRunner) Init() error {
 		return err
 	}
 
+	// Copy docker-compose file to the log dir for debugging purposes.
 	err = fs.CopyFile(fs.FS, "docker-compose.yml", path.Join(r.logsDir, "docker-compose.yml"))
 	if err != nil {
-		return err
+		// Log error and continue.
+		log.Error(err)
+	}
+
+	// Copy upload exclude list to the log dir for debugging purposes.
+	err = fs.CopyFile(fs.FS, dcompose.UploadExcludesFilename, path.Join(r.logsDir, dcompose.UploadExcludesFilename))
+	if err != nil {
+		// Log error and continue.
+		log.Error(err)
 	}
 
 	transferTrigger, err := os.Create(path.Join(r.logsDir, "de-transfer-trigger.log"))

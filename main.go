@@ -25,8 +25,8 @@ import (
 	"github.com/cyverse-de/version"
 	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
-	"gopkg.in/cyverse-de/messaging.v2"
-	"gopkg.in/cyverse-de/model.v1"
+	"gopkg.in/cyverse-de/messaging.v4"
+	"gopkg.in/cyverse-de/model.v2"
 
 	"github.com/spf13/viper"
 )
@@ -46,6 +46,22 @@ var log = logrus.WithFields(logrus.Fields{
 
 func init() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
+}
+
+// Creates the output upload exclusions file, required by the JobCompose InitFromJob method.
+func createUploadExclusionsFile() {
+	excludeFile, err := os.Create(dcompose.UploadExcludesFilename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer excludeFile.Close()
+
+	for _, excludePath := range job.ExcludeArguments() {
+		_, err = fmt.Fprintln(excludeFile, excludePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
 
 // CleanableJob is a job definition that contains extra information that allows
@@ -190,6 +206,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Create the output upload exclusions file required by the JobCompose InitFromJob method.
+	createUploadExclusionsFile()
 
 	// Populates the data structure that will become the docker-compose file with
 	// information from the job definition.
