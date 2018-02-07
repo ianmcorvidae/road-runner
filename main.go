@@ -17,7 +17,7 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/logcabin"
 	"github.com/cyverse-de/road-runner/dcompose"
