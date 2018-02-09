@@ -14,10 +14,28 @@ import (
 	"github.com/cyverse-de/road-runner/fs"
 	"github.com/kr/pty"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"gopkg.in/cyverse-de/messaging.v4"
 	"gopkg.in/cyverse-de/model.v2"
 )
+
+// logrusProxyWriter will prevent
+// "Error while reading from Writer: bufio.Scanner: token too long" errors
+// if a docker command generates a lot of output
+// (from pulling many input containers at once, for example)
+// and Logrus attempts to log all of that output in one log line.
+type logrusProxyWriter struct {
+	entry *logrus.Entry
+}
+
+func (w *logrusProxyWriter) Write(b []byte) (int, error) {
+	return fmt.Fprintf(w.entry.Writer(), string(b))
+}
+
+var logWriter = &logrusProxyWriter{
+	entry: log,
+}
 
 // JobRunner provides the functionality needed to run jobs.
 type JobRunner struct {
@@ -125,7 +143,7 @@ func (r *JobRunner) DockerLogin() error {
 				return err
 			}
 			go func() {
-				io.Copy(log.Writer(), f)
+				io.Copy(logWriter, f)
 			}()
 			err = authCommand.Wait()
 			if err != nil {
@@ -163,8 +181,8 @@ func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
 			svcname,
 		)
 		dataCommand.Env = os.Environ()
-		dataCommand.Stderr = log.Writer()
-		dataCommand.Stdout = log.Writer()
+		dataCommand.Stderr = logWriter
+		dataCommand.Stdout = logWriter
 		if err = dataCommand.Run(); err != nil {
 			running(r.client, r.job, fmt.Sprintf("error creating data container data_%d: %s", index, err.Error()))
 			return messaging.StatusDockerCreateFailed, errors.Wrapf(err, "failed to create data container data_%d", index)
@@ -383,8 +401,9 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	networkCreateCmd := exec.Command(dockerPath, "network", "create", "--driver", "bridge", networkName)
 	networkCreateCmd.Env = os.Environ()
 	networkCreateCmd.Dir = runner.workingDir
-	networkCreateCmd.Stdout = log.Writer()
-	networkCreateCmd.Stderr = log.Writer()
+	networkCreateCmd.Stdout = logWriter
+	networkCreateCmd.Stderr = logWriter
+
 	err = networkCreateCmd.Run()
 	if err != nil {
 		log.Error(err) // don't need to fail, since docker-compose is *supposed* to create the network
@@ -394,8 +413,9 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	pullCommand := exec.Command(composePath, "-p", runner.projectName, "-f", "docker-compose.yml", "pull", "--parallel")
 	pullCommand.Env = os.Environ()
 	pullCommand.Dir = runner.workingDir
-	pullCommand.Stdout = log.Writer()
-	pullCommand.Stderr = log.Writer()
+	pullCommand.Stdout = logWriter
+	pullCommand.Stderr = logWriter
+
 	err = pullCommand.Run()
 	if err != nil {
 		log.Error(err)
