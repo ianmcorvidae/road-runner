@@ -2,14 +2,6 @@
 	"version": 0,
 	"dependencies": [
 		{
-			"importpath": "github.com/Sirupsen/logrus",
-			"repository": "https://github.com/Sirupsen/logrus",
-			"vcs": "git",
-			"revision": "5e5dc898656f695e2a086b8e12559febbfc01562",
-			"branch": "master",
-			"notests": true
-		},
-		{
 			"importpath": "github.com/armon/consul-api",
 			"repository": "https://github.com/armon/consul-api",
 			"vcs": "git",
@@ -203,7 +195,7 @@
 			"importpath": "github.com/sirupsen/logrus",
 			"repository": "https://github.com/sirupsen/logrus",
 			"vcs": "git",
-			"revision": "5e5dc898656f695e2a086b8e12559febbfc01562",
+			"revision": "9f91ab2ef97544cdca176a1fb9165f2cf6fd709b",
 			"branch": "master",
 			"notests": true
 		},
