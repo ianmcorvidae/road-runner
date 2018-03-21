@@ -142,16 +142,8 @@ func New(ld string, pathprefix string) (*JobCompose, error) {
 // InitFromJob fills out values as appropriate for running in the DE's Condor
 // Cluster.
 func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir string) {
-	volpath := path.Join(workingdir, VOLUMEDIR)
+	workingVolumeHostPath := path.Join(workingdir, VOLUMEDIR)
 	// The volume containing the local working directory
-	j.Volumes[job.InvocationID] = &Volume{
-		Driver: "local",
-		Options: map[string]string{
-			"type":   "none",
-			"device": volpath,
-			"o":      "bind",
-		},
-	}
 
 	porklockImage := cfg.GetString("porklock.image")
 	porklockTag := cfg.GetString("porklock.tag")
@@ -195,7 +187,7 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 			},
 			WorkingDir: WORKDIR,
 			Volumes: []string{
-				fmt.Sprintf("%s:%s:rw", job.InvocationID, WORKDIR),
+				strings.Join([]string{workingVolumeHostPath, WORKDIR, "rw"}, ":"),
 			},
 			Labels: map[string]string{
 				model.DockerLabelKey: strconv.Itoa(InputContainer),
@@ -205,7 +197,7 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 
 	// Add the steps to the docker-compose file.
 	for index, step := range job.Steps {
-		j.ConvertStep(&step, index, job.Submitter, job.InvocationID)
+		j.ConvertStep(&step, index, job.Submitter, job.InvocationID, workingVolumeHostPath)
 	}
 
 	// Add the final output job
@@ -223,7 +215,7 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 		},
 		WorkingDir: WORKDIR,
 		Volumes: []string{
-			strings.Join([]string{job.InvocationID, WORKDIR, "rw"}, ":"),
+			strings.Join([]string{workingVolumeHostPath, WORKDIR, "rw"}, ":"),
 			strings.Join([]string{excludesPath, excludesMount, "ro"}, ":"),
 		},
 		Labels: map[string]string{
@@ -234,7 +226,7 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 }
 
 // ConvertStep will add the job step to the JobCompose services
-func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string) {
+func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID, workingDirHostPath string) {
 	// Construct the name of the image
 	// Set the name of the image for the container.
 	var imageName string
@@ -315,7 +307,7 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID string
 	}
 
 	// The working directory needs to be mounted as a volume.
-	svc.Volumes = append(svc.Volumes, fmt.Sprintf("%s:%s:rw", invID, stepContainer.WorkingDirectory()))
+	svc.Volumes = append(svc.Volumes, strings.Join([]string{workingDirHostPath, stepContainer.WorkingDirectory(), "rw"}, ":"))
 
 	// The TMPDIR needs to be mounted as a volume
 	svc.Volumes = append(svc.Volumes, fmt.Sprintf("./%s:/tmp:rw", TMPDIR))
