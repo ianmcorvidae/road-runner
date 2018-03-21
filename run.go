@@ -84,6 +84,13 @@ func (r *JobRunner) Init() error {
 		return err
 	}
 
+	// Set world-write perms on volumeDir, so non-root users can create job outputs.
+	err = os.Chmod(r.volumeDir, 0777)
+	if err != nil {
+		// Log error and continue.
+		log.Error(err)
+	}
+
 	// Copy docker-compose file to the log dir for debugging purposes.
 	err = fs.CopyFile(fs.FS, "docker-compose.yml", path.Join(r.logsDir, "docker-compose.yml"))
 	if err != nil {
