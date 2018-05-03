@@ -158,8 +158,8 @@ services:
 	if err != nil {
 		t.Error(err)
 	}
-	if jc.Version != "2.1" {
-		t.Errorf("version was %s instead of '2.1'", jc.Version)
+	if jc.Version != "2" {
+		t.Errorf("version was %s instead of '2'", jc.Version)
 	}
 	if len(jc.Networks) != 2 {
 		t.Errorf("number of networks was %d instead of 1", len(jc.Networks))
@@ -337,7 +337,7 @@ func TestNew(t *testing.T) {
 	if jc == nil {
 		t.Error("New() returned nil")
 	}
-	if jc.Version != "2" {
+	if jc.Version != "2.1" {
 		t.Errorf("version was %s", jc.Version)
 	}
 }
