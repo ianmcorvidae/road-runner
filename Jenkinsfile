@@ -27,8 +27,14 @@ node('docker') {
         dockerPusher = "push-${env.BUILD_TAG}"
         try {
             stage "Test"
-            sh "docker run --rm --name ${dockerTestRunner} --entrypoint 'go' ${dockerRepo} test github.com/cyverse-de/${service.repo}"
+            try {
+              sh "docker run --rm --name ${dockerTestRunner} --entrypoint 'sh' ${dockerRepo} -c \"go test -v github.com/cyverse-de/${service.repo} github.com/cyverse-de/${service.repo}/dcompose github.com/cyverse-de/${service.repo}/fs | tee /dev/stderr | go-junit-report\" > test-results.xml"
 
+            } finally {
+                junit 'test-results.xml'
+
+                sh "docker run --rm --name ${dockerTestCleanup} -v \$(pwd):/build -w /build alpine rm -r test-results.xml"
+            }
             milestone 100
             stage "Docker Push"
             dockerPushRepo = "${service.dockerUser}/${service.repo}:${env.BRANCH_NAME}"
