@@ -149,32 +149,6 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 	porklockTag := cfg.GetString("porklock.tag")
 	porklockImageName := fmt.Sprintf("%s:%s", porklockImage, porklockTag)
 
-	for index, dc := range job.DataContainers() {
-		svcKey := fmt.Sprintf("data_%d", index)
-		j.Services[svcKey] = &Service{
-			Image:         fmt.Sprintf("%s:%s", dc.Name, dc.Tag),
-			ContainerName: fmt.Sprintf("%s-%s", dc.NamePrefix, job.InvocationID),
-			EntryPoint:    "/bin/true",
-			Logging:       &LoggingConfig{Driver: "none"},
-			Labels: map[string]string{
-				model.DockerLabelKey: strconv.Itoa(DataContainer),
-			},
-		}
-
-		svc := j.Services[svcKey]
-		if dc.HostPath != "" || dc.ContainerPath != "" {
-			var rw string
-			if dc.ReadOnly {
-				rw = "ro"
-			} else {
-				rw = "rw"
-			}
-			svc.Volumes = []string{
-				fmt.Sprintf("%s:%s:%s", dc.HostPath, dc.ContainerPath, rw),
-			}
-		}
-	}
-
 	for index, input := range job.Inputs() {
 		j.Services[fmt.Sprintf("input_%d", index)] = &Service{
 			CapAdd:  []string{"IPC_LOCK"},
@@ -225,8 +199,38 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 	}
 }
 
+// ConvertDataContainer will add the data container to the JobCompose services and returns the service name for it
+func (j *JobCompose) ConvertDataContainer(dc model.VolumesFrom, stepIndex, dataContainerIndex int, invID string) string {
+	svcKey := fmt.Sprintf("data_%d_%d", stepIndex, dataContainerIndex)
+	j.Services[svcKey] = &Service{
+		Image:         fmt.Sprintf("%s:%s", dc.Name, dc.Tag),
+		ContainerName: fmt.Sprintf("%s_%d_%d_%s", dc.NamePrefix, stepIndex, dataContainerIndex, invID),
+		EntryPoint:    "/bin/true",
+		Logging:       &LoggingConfig{Driver: "none"},
+		Labels: map[string]string{
+			model.DockerLabelKey: strconv.Itoa(DataContainer),
+		},
+	}
+
+	svc := j.Services[svcKey]
+	if dc.HostPath != "" || dc.ContainerPath != "" {
+		var rw string
+		if dc.ReadOnly {
+			rw = "ro"
+		} else {
+			rw = "rw"
+		}
+		svc.Volumes = []string{
+			fmt.Sprintf("%s:%s:%s", dc.HostPath, dc.ContainerPath, rw),
+		}
+	}
+
+	return svcKey
+}
+
 // ConvertStep will add the job step to the JobCompose services
 func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID, workingDirHostPath string) {
+
 	// Construct the name of the image
 	// Set the name of the image for the container.
 	var imageName string
@@ -295,15 +299,11 @@ func (j *JobCompose) ConvertStep(step *model.Step, index int, user, invID, worki
 	}
 
 	// Handles volumes created by other containers.
-	for _, vf := range stepContainer.VolumesFrom {
-		containerName := fmt.Sprintf("%s-%s", vf.NamePrefix, invID)
-		var foundService string
-		for svckey, svc := range j.Services { // svckey is the docker-compose service name.
-			if svc.ContainerName == containerName {
-				foundService = svckey
-			}
-		}
-		svc.VolumesFrom = append(svc.VolumesFrom, foundService)
+	for dcIndex, dc := range stepContainer.VolumesFrom {
+		// create data container
+		svckey := j.ConvertDataContainer(dc, index, dcIndex, invID)
+
+		svc.VolumesFrom = append(svc.VolumesFrom, svckey)
 	}
 
 	// The working directory needs to be mounted as a volume.
