@@ -172,29 +172,31 @@ func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
 		err error
 	)
 	composePath := r.cfg.GetString("docker-compose.path")
-	for index := range r.job.DataContainers() {
-		running(r.client, r.job, fmt.Sprintf("creating data container data_%d", index))
-		svcname := fmt.Sprintf("data_%d", index)
-		dataCommand := exec.Command(
-			composePath,
-			"-p",
-			r.projectName,
-			"-f",
-			"docker-compose.yml",
-			"up",
-			"--abort-on-container-exit",
-			"--exit-code-from", svcname,
-			"--no-color",
-			svcname,
-		)
-		dataCommand.Env = os.Environ()
-		dataCommand.Stderr = logWriter
-		dataCommand.Stdout = logWriter
-		if err = dataCommand.Run(); err != nil {
-			running(r.client, r.job, fmt.Sprintf("error creating data container data_%d: %s", index, err.Error()))
-			return messaging.StatusDockerCreateFailed, errors.Wrapf(err, "failed to create data container data_%d", index)
+	for stepIndex, step := range r.job.Steps {
+		for dcIndex := range step.Component.Container.VolumesFrom {
+			svcname := fmt.Sprintf("data_%d_%d", stepIndex, dcIndex)
+			running(r.client, r.job, fmt.Sprintf("creating data container %s", svcname))
+			dataCommand := exec.Command(
+				composePath,
+				"-p",
+				r.projectName,
+				"-f",
+				"docker-compose.yml",
+				"up",
+				"--abort-on-container-exit",
+				"--exit-code-from", svcname,
+				"--no-color",
+				svcname,
+			)
+			dataCommand.Env = os.Environ()
+			dataCommand.Stderr = logWriter
+			dataCommand.Stdout = logWriter
+			if err = dataCommand.Run(); err != nil {
+				running(r.client, r.job, fmt.Sprintf("error creating data container %s: %s", svcname, err.Error()))
+				return messaging.StatusDockerCreateFailed, errors.Wrapf(err, "failed to create data container %s", svcname)
+			}
+			running(r.client, r.job, fmt.Sprintf("finished creating data container %s", svcname))
 		}
-		running(r.client, r.job, fmt.Sprintf("finished creating data container data_%d", index))
 	}
 	return messaging.Success, nil
 }
