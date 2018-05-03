@@ -158,8 +158,8 @@ services:
 	if err != nil {
 		t.Error(err)
 	}
-	if jc.Version != "2" {
-		t.Errorf("version was %s instead of '2'", jc.Version)
+	if jc.Version != "2.1" {
+		t.Errorf("version was %s instead of '2.1'", jc.Version)
 	}
 	if len(jc.Networks) != 2 {
 		t.Errorf("number of networks was %d instead of 1", len(jc.Networks))
@@ -348,8 +348,8 @@ func TestConvertStep(t *testing.T) {
 		t.Error(err)
 	}
 	jc.ConvertStep(&testJob.Steps[0], 0, testJob.Submitter, testJob.InvocationID, "")
-	if len(jc.Services) != 1 {
-		t.Errorf("number of services was %d and not 1", len(jc.Services))
+	if len(jc.Services) != 3 { // service + 2 data containers
+		t.Errorf("number of services was %d and not 3", len(jc.Services))
 	}
 	if _, ok := jc.Services["step_0"]; !ok {
 		t.Error("step_0 not found")
