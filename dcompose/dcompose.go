@@ -153,7 +153,7 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 		svcKey := fmt.Sprintf("data_%d", index)
 		j.Services[svcKey] = &Service{
 			Image:         fmt.Sprintf("%s:%s", dc.Name, dc.Tag),
-			ContainerName: fmt.Sprintf("%s-%s", dc.NamePrefix, job.InvocationID),
+			ContainerName: fmt.Sprintf("%s_%d_%s", dc.NamePrefix, index, job.InvocationID),
 			EntryPoint:    "/bin/true",
 			Logging:       &LoggingConfig{Driver: "none"},
 			Labels: map[string]string{
