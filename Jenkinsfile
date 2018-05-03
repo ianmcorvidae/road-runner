@@ -24,6 +24,7 @@ node('docker') {
         fingerprint "${dockerRepo}.docker-image-sha"
 
         dockerTestRunner = "test-${env.BUILD_TAG}"
+        dockerTestCleanup = "test-cleanup-${env.BUILD_TAG}"
         dockerPusher = "push-${env.BUILD_TAG}"
         try {
             stage "Test"
@@ -56,6 +57,9 @@ node('docker') {
         } finally {
             sh returnStatus: true, script: "docker kill ${dockerTestRunner}"
             sh returnStatus: true, script: "docker rm ${dockerTestRunner}"
+
+            sh returnStatus: true, script: "docker kill ${dockerTestCleanup}"
+            sh returnStatus: true, script: "docker rm ${dockerTestCleanup}"
 
             sh returnStatus: true, script: "docker kill ${dockerPusher}"
             sh returnStatus: true, script: "docker rm ${dockerPusher}"
