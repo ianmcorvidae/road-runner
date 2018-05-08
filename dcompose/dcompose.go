@@ -142,30 +142,40 @@ func New(ld string, pathprefix string) (*JobCompose, error) {
 // InitFromJob fills out values as appropriate for running in the DE's Condor
 // Cluster.
 func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir string) {
+	// The host path for the working directory volume mount
 	workingVolumeHostPath := path.Join(workingdir, VOLUMEDIR)
-	// The volume containing the local working directory
 
 	porklockImage := cfg.GetString("porklock.image")
 	porklockTag := cfg.GetString("porklock.tag")
 	porklockImageName := fmt.Sprintf("%s:%s", porklockImage, porklockTag)
 
-	for index, input := range job.Inputs() {
-		j.Services[fmt.Sprintf("input_%d", index)] = &Service{
-			CapAdd:  []string{"IPC_LOCK"},
-			Image:   porklockImageName,
-			Command: input.Arguments(job.Submitter, job.FileMetadata),
-			Environment: map[string]string{
-				"VAULT_ADDR":  "${VAULT_ADDR}",
-				"VAULT_TOKEN": "${VAULT_TOKEN}",
-				"JOB_UUID":    job.InvocationID,
-			},
-			WorkingDir: WORKDIR,
-			Volumes: []string{
-				strings.Join([]string{workingVolumeHostPath, WORKDIR, "rw"}, ":"),
-			},
-			Labels: map[string]string{
-				model.DockerLabelKey: strconv.Itoa(InputContainer),
-			},
+	if job.InputPathListFile != "" {
+		inputPathListPath := path.Join(workingdir, job.InputPathListFile)
+		inputPathListMount := path.Join(CONFIGDIR, job.InputPathListFile)
+
+		inputsSvc := NewPorklockService(
+			InputContainer,
+			job.InvocationID,
+			workingVolumeHostPath,
+			porklockImageName,
+			job.InputSourceListArguments(inputPathListMount),
+		)
+		inputsSvc.Volumes = append(
+			inputsSvc.Volumes,
+			strings.Join([]string{inputPathListPath, inputPathListMount, "ro"}, ":"),
+		)
+
+		j.Services["download_inputs"] = inputsSvc
+	} else {
+		// Backwards compatibility for individual input downloads
+		for index, input := range job.Inputs() {
+			j.Services[fmt.Sprintf("input_%d", index)] = NewPorklockService(
+				InputContainer,
+				job.InvocationID,
+				workingVolumeHostPath,
+				porklockImageName,
+				input.Arguments(job.Submitter, job.FileMetadata),
+			)
 		}
 	}
 
@@ -178,23 +188,38 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 	excludesPath := path.Join(workingdir, UploadExcludesFilename)
 	excludesMount := path.Join(CONFIGDIR, UploadExcludesFilename)
 
-	j.Services["upload_outputs"] = &Service{
+	uploadOutputsSvc := NewPorklockService(
+		OutputContainer,
+		job.InvocationID,
+		workingVolumeHostPath,
+		porklockImageName,
+		job.FinalOutputArguments(excludesMount),
+	)
+	uploadOutputsSvc.Volumes = append(
+		uploadOutputsSvc.Volumes,
+		strings.Join([]string{excludesPath, excludesMount, "ro"}, ":"),
+	)
+
+	j.Services["upload_outputs"] = uploadOutputsSvc;
+}
+
+func NewPorklockService(containertype int, invocationID, workingVolumeHostPath, porklockImageName string, porklockCommand []string) *Service {
+	return &Service{
 		CapAdd:  []string{"IPC_LOCK"},
 		Image:   porklockImageName,
-		Command: job.FinalOutputArguments(excludesMount),
+		Command: porklockCommand,
 		Environment: map[string]string{
 			"VAULT_ADDR":  "${VAULT_ADDR}",
 			"VAULT_TOKEN": "${VAULT_TOKEN}",
-			"JOB_UUID":    job.InvocationID,
+			"JOB_UUID":    invocationID,
 		},
 		WorkingDir: WORKDIR,
 		Volumes: []string{
 			strings.Join([]string{workingVolumeHostPath, WORKDIR, "rw"}, ":"),
-			strings.Join([]string{excludesPath, excludesMount, "ro"}, ":"),
 		},
 		Labels: map[string]string{
-			model.DockerLabelKey: job.InvocationID,
-			TypeLabel:            strconv.Itoa(OutputContainer),
+			model.DockerLabelKey: invocationID,
+			TypeLabel:            strconv.Itoa(containertype),
 		},
 	}
 }
