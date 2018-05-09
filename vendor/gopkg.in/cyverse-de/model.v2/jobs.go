@@ -76,16 +76,19 @@ type Job struct {
 	FailureCount       int64          `json:"failure_count"`
 	FailureThreshold   int64          `json:"failure_threshold"`
 	FileMetadata       []FileMetadata `json:"file-metadata"`
-	FilterFiles        []string       `json:"filter_files"` //comes from config, not upstream service
-	Group              string         `json:"group"`        //untested for now
+	FilterFiles        []string       `json:"filter_files"`       //comes from config, not upstream service
+	Group              string         `json:"group"`              //untested for now
+	InputTicketsFile   string         `json:"inputs_ticket_list"` //path to a list of inputs with tickets (not from upstream).
 	InvocationID       string         `json:"uuid"`
 	IRODSBase          string         `json:"irods_base"`
 	Name               string         `json:"name"`
 	NFSBase            string         `json:"nfs_base"`
 	Notify             bool           `json:"notify"`
 	NowDate            string         `json:"now_date"`
-	OutputDir          string         `json:"output_dir"`   //the value parsed out of the JSON. Use OutputDirectory() instead.
-	RequestDisk        string         `json:"request_disk"` //untested for now
+	OutputDir          string         `json:"output_dir"`         //the value parsed out of the JSON. Use OutputDirectory() instead.
+	OutputDirTicket    string         `json:"output_dir_ticket"`  //the write ticket for output_dir (assumes output_dir is set correctly).
+	OutputTicketFile   string         `json:"output_ticket_list"` //path to the file of the output dest with ticket (not from upstream).
+	RequestDisk        string         `json:"request_disk"`       //untested for now
 	RequestType        string         `json:"request_type"`
 	RunOnNFS           bool           `json:"run-on-nfs"`
 	SkipParentMetadata bool           `json:"skip-parent-meta"`
@@ -96,6 +99,7 @@ type Job struct {
 	UserID             string         `json:"user_id"`
 	UserGroups         []string       `json:"user_groups"`
 	WikiURL            string         `json:"wiki_url"`
+	ConfigFile         string         `json:"config_file"` //path to the job configuration file (not from upstream)
 }
 
 // New returns a pointer to a newly instantiated Job with NowDate set.
@@ -162,6 +166,7 @@ func (s *Job) Sanitize() {
 	for i, step := range s.Steps {
 		step.Component.Container.Image.Name = strings.TrimSpace(step.Component.Container.Image.Name)
 		step.Component.Container.Image.Tag = strings.TrimSpace(step.Component.Container.Image.Tag)
+		step.Component.Container.Image.OSGImagePath = strings.TrimSpace(step.Component.Container.Image.OSGImagePath)
 		step.Component.Container.Name = strings.TrimSpace(step.Component.Container.Name)
 
 		for j, vf := range step.Component.Container.VolumesFrom {
@@ -369,6 +374,16 @@ func (s *Job) UsesVolumes() bool {
 		}
 	}
 	return false
+}
+
+func (job *Job) FilterInputsWithTickets() []StepInput {
+	var inputs []StepInput
+	for _, input := range job.Inputs() {
+		if input.Ticket != "" {
+			inputs = append(inputs, input)
+		}
+	}
+	return inputs
 }
 
 // FileMetadata describes a unit of metadata that should get associated with
