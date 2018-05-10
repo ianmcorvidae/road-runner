@@ -112,6 +112,15 @@ func (r *JobRunner) Init() error {
 		log.Error(err)
 	}
 
+	// Copy input path list to the log dir for debugging purposes.
+	if r.job.InputPathListFile != "" {
+		err = fs.CopyFile(fs.FS, r.job.InputPathListFile, path.Join(r.logsDir, r.job.InputPathListFile))
+		if err != nil {
+			// Log error and continue.
+			log.Error(err)
+		}
+	}
+
 	transferTrigger, err := os.Create(path.Join(r.logsDir, "de-transfer-trigger.log"))
 	if err != nil {
 		return err
@@ -209,47 +218,60 @@ func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
 }
 
 func (r *JobRunner) downloadInputs() (messaging.StatusCode, error) {
-	var (
-		exitCode int64
-	)
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("VAULT_ADDR=%s", r.cfg.GetString("vault.url")))
 	env = append(env, fmt.Sprintf("VAULT_TOKEN=%s", r.cfg.GetString("vault.token")))
 	composePath := r.cfg.GetString("docker-compose.path")
-	for index, input := range r.job.Inputs() {
-		running(r.client, r.job, fmt.Sprintf("Downloading %s", input.IRODSPath()))
-		stderr, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stderr-input-%d", index)))
-		if err != nil {
-			log.Error(err)
+	if job.InputPathListFile != "" {
+		return r.downloadInputStep("download_inputs", job.InputPathListFile, composePath, env)
+	} else {
+		for index, input := range r.job.Inputs() {
+			svcname := fmt.Sprintf("input_%d", index)
+			if status, err := r.downloadInputStep(svcname, input.IRODSPath(), composePath, env); err != nil {
+				return status, err
+			}
 		}
-		defer stderr.Close()
-		stdout, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stdout-input-%d", index)))
-		if err != nil {
-			log.Error(err)
-		}
-		defer stdout.Close()
-		svcname := fmt.Sprintf("input_%d", index)
-		downloadCommand := exec.Command(
-			composePath,
-			"-p", r.projectName,
-			"-f", "docker-compose.yml",
-			"up",
-			"--no-color",
-			"--abort-on-container-exit",
-			"--exit-code-from", svcname,
-			svcname,
-		)
-		downloadCommand.Env = env
-		downloadCommand.Stderr = stderr
-		downloadCommand.Stdout = stdout
-		if err = downloadCommand.Run(); err != nil {
-			running(r.client, r.job, fmt.Sprintf("error downloading %s: %s", input.IRODSPath(), err.Error()))
-			return messaging.StatusInputFailed, errors.Wrapf(err, "failed to download %s with an exit code of %d", input.IRODSPath(), exitCode)
-		}
-		stdout.Close()
-		stderr.Close()
-		running(r.client, r.job, fmt.Sprintf("finished downloading %s", input.IRODSPath()))
 	}
+
+	return messaging.Success, nil
+}
+
+func (r *JobRunner) downloadInputStep(svcname, inputPath, composePath string, env []string) (messaging.StatusCode, error) {
+	var (
+		exitCode int64
+	)
+	running(r.client, r.job, fmt.Sprintf("Downloading %s", inputPath))
+	stderr, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stderr-%s", svcname)))
+	if err != nil {
+		log.Error(err)
+	}
+	defer stderr.Close()
+	stdout, err := os.Create(path.Join(r.logsDir, fmt.Sprintf("logs-stdout-%s", svcname)))
+	if err != nil {
+		log.Error(err)
+	}
+	defer stdout.Close()
+	downloadCommand := exec.Command(
+		composePath,
+		"-p", r.projectName,
+		"-f", "docker-compose.yml",
+		"up",
+		"--no-color",
+		"--abort-on-container-exit",
+		"--exit-code-from", svcname,
+		svcname,
+	)
+	downloadCommand.Env = env
+	downloadCommand.Stderr = stderr
+	downloadCommand.Stdout = stdout
+	if err = downloadCommand.Run(); err != nil {
+		running(r.client, r.job, fmt.Sprintf("error downloading %s: %s", inputPath, err.Error()))
+		return messaging.StatusInputFailed, errors.Wrapf(err, "failed to download %s with an exit code of %d", inputPath, exitCode)
+	}
+	stdout.Close()
+	stderr.Close()
+	running(r.client, r.job, fmt.Sprintf("finished downloading %s", inputPath))
+
 	return messaging.Success, nil
 }
 
