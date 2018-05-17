@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -183,7 +184,7 @@ type JobUpdatePublisher interface {
 	PublishJobUpdate(m *messaging.UpdateMessage) error
 }
 
-func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
+func (r *JobRunner) createDataContainers(ctx context.Context) (messaging.StatusCode, error) {
 	var (
 		err error
 	)
@@ -192,7 +193,8 @@ func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
 		for dcIndex := range step.Component.Container.VolumesFrom {
 			svcname := fmt.Sprintf("data_%d_%d", stepIndex, dcIndex)
 			running(r.client, r.job, fmt.Sprintf("creating data container %s", svcname))
-			dataCommand := exec.Command(
+			dataCommand := exec.CommandContext(
+				ctx,
 				composePath,
 				"-p",
 				r.projectName,
@@ -217,17 +219,17 @@ func (r *JobRunner) createDataContainers() (messaging.StatusCode, error) {
 	return messaging.Success, nil
 }
 
-func (r *JobRunner) downloadInputs() (messaging.StatusCode, error) {
+func (r *JobRunner) downloadInputs(ctx context.Context) (messaging.StatusCode, error) {
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("VAULT_ADDR=%s", r.cfg.GetString("vault.url")))
 	env = append(env, fmt.Sprintf("VAULT_TOKEN=%s", r.cfg.GetString("vault.token")))
 	composePath := r.cfg.GetString("docker-compose.path")
 	if job.InputPathListFile != "" {
-		return r.downloadInputStep("download_inputs", job.InputPathListFile, composePath, env)
+		return r.downloadInputStep(ctx, "download_inputs", job.InputPathListFile, composePath, env)
 	} else {
 		for index, input := range r.job.Inputs() {
 			svcname := fmt.Sprintf("input_%d", index)
-			if status, err := r.downloadInputStep(svcname, input.IRODSPath(), composePath, env); err != nil {
+			if status, err := r.downloadInputStep(ctx, svcname, input.IRODSPath(), composePath, env); err != nil {
 				return status, err
 			}
 		}
@@ -236,7 +238,7 @@ func (r *JobRunner) downloadInputs() (messaging.StatusCode, error) {
 	return messaging.Success, nil
 }
 
-func (r *JobRunner) downloadInputStep(svcname, inputPath, composePath string, env []string) (messaging.StatusCode, error) {
+func (r *JobRunner) downloadInputStep(ctx context.Context, svcname, inputPath, composePath string, env []string) (messaging.StatusCode, error) {
 	var (
 		exitCode int64
 	)
@@ -251,7 +253,8 @@ func (r *JobRunner) downloadInputStep(svcname, inputPath, composePath string, en
 		log.Error(err)
 	}
 	defer stdout.Close()
-	downloadCommand := exec.Command(
+	downloadCommand := exec.CommandContext(
+		ctx,
 		composePath,
 		"-p", r.projectName,
 		"-f", "docker-compose.yml",
@@ -290,7 +293,7 @@ func parse(b64 string) (*authInfo, error) {
 	return a, err
 }
 
-func (r *JobRunner) runAllSteps() (messaging.StatusCode, error) {
+func (r *JobRunner) runAllSteps(ctx context.Context) (messaging.StatusCode, error) {
 	var err error
 
 	for idx, step := range r.job.Steps {
@@ -317,7 +320,8 @@ func (r *JobRunner) runAllSteps() (messaging.StatusCode, error) {
 
 		composePath := r.cfg.GetString("docker-compose.path")
 		svcname := fmt.Sprintf("step_%d", idx)
-		runCommand := exec.Command(
+		runCommand := exec.CommandContext(
+			ctx,
 			composePath,
 			"-p", r.projectName,
 			"-f", "docker-compose.yml",
@@ -408,7 +412,7 @@ func parseRepo(imagename string) string {
 }
 
 // Run executes the job, and returns the exit code on the exit channel.
-func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan messaging.StatusCode) {
+func Run(ctx context.Context, client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan messaging.StatusCode) {
 	host, err := os.Hostname()
 	if err != nil {
 		log.Error(err)
@@ -436,7 +440,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 
 	networkName := fmt.Sprintf("%s_default", runner.projectName)
 	dockerPath := cfg.GetString("docker.path")
-	networkCreateCmd := exec.Command(dockerPath, "network", "create", "--driver", "bridge", networkName)
+	networkCreateCmd := exec.CommandContext(ctx, dockerPath, "network", "create", "--driver", "bridge", networkName)
 	networkCreateCmd.Env = os.Environ()
 	networkCreateCmd.Dir = runner.workingDir
 	networkCreateCmd.Stdout = logWriter
@@ -448,7 +452,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	}
 
 	composePath := cfg.GetString("docker-compose.path")
-	pullCommand := exec.Command(composePath, "-p", runner.projectName, "-f", "docker-compose.yml", "pull", "--parallel")
+	pullCommand := exec.CommandContext(ctx, composePath, "-p", runner.projectName, "-f", "docker-compose.yml", "pull", "--parallel")
 	pullCommand.Env = os.Environ()
 	pullCommand.Dir = runner.workingDir
 	pullCommand.Stdout = logWriter
@@ -469,7 +473,7 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	}
 
 	if runner.status == messaging.Success {
-		if runner.status, err = runner.createDataContainers(); err != nil {
+		if runner.status, err = runner.createDataContainers(ctx); err != nil {
 			log.Error(err)
 		}
 	}
@@ -478,14 +482,14 @@ func Run(client JobUpdatePublisher, job *model.Job, cfg *viper.Viper, exit chan 
 	// correct versions of the tools. Don't bother pulling in data in that case,
 	// things are already screwed up.
 	if runner.status == messaging.Success {
-		if runner.status, err = runner.downloadInputs(); err != nil {
+		if runner.status, err = runner.downloadInputs(ctx); err != nil {
 			log.Error(err)
 		}
 	}
 	// Only attempt to run the steps if the input downloads succeeded. No reason
 	// to run the steps if there's no/corrupted data to operate on.
 	if runner.status == messaging.Success {
-		if runner.status, err = runner.runAllSteps(); err != nil {
+		if runner.status, err = runner.runAllSteps(ctx); err != nil {
 			log.Error(err)
 		}
 	}

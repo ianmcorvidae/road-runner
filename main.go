@@ -7,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -17,18 +18,17 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/sirupsen/logrus"
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/logcabin"
 	"github.com/cyverse-de/road-runner/dcompose"
 	"github.com/cyverse-de/road-runner/fs"
 	"github.com/cyverse-de/version"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"github.com/streadway/amqp"
 	"gopkg.in/cyverse-de/messaging.v4"
 	"gopkg.in/cyverse-de/model.v2"
-
-	"github.com/spf13/viper"
 )
 
 var (
@@ -89,6 +89,8 @@ func main() {
 
 	logcabin.Init("road-runner", "road-runner")
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	sigquitter := make(chan bool)
 	sighandler := InitSignalHandler()
 	sighandler.Receive(
@@ -97,14 +99,14 @@ func main() {
 			log.Info("Received signal:", sig)
 			if job == nil {
 				log.Warn("Info didn't get parsed from the job file, can't clean up. Probably don't need to.")
+				os.Exit(-1)
+			} else {
+				cancel()
+
+				if client != nil {
+					fail(client, job, fmt.Sprintf("Received signal %s", sig))
+				}
 			}
-			if job != nil {
-				cleanup(cfg)
-			}
-			if client != nil && job != nil {
-				fail(client, job, fmt.Sprintf("Received signal %s", sig))
-			}
-			os.Exit(-1)
 		},
 		func() {
 			log.Info("Signal handler is quitting")
@@ -254,15 +256,14 @@ func main() {
 		func(d amqp.Delivery) {
 			d.Ack(false)
 			running(client, job, "Received stop request")
-			exit <- messaging.StatusKilled
+			cancel()
 		},
 	)
 
 	// Actually execute all of the job steps.
-	go Run(client, job, cfg, exit)
+	go Run(ctx, client, job, cfg, exit)
 
-	// Block waiting for the exit code, which will either come from the Run()
-	// goroutine or from Condor passing along a signal.
+	// Block waiting for the exit code, which will come from Run().
 	exitCode := <-finalExit
 
 	// Clean up the job file. Cleaning it out will prevent image-janitor and
