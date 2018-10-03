@@ -1,8 +1,10 @@
-FROM golang:1.7
+FROM golang:1.11-alpine
 
+RUN apk add --no-cache git
 RUN go get github.com/jstemmer/go-junit-report
 
 COPY . /go/src/github.com/cyverse-de/road-runner
+ENV CGO_ENABLED=0
 RUN go install github.com/cyverse-de/road-runner
 
 ENTRYPOINT ["road-runner"]
