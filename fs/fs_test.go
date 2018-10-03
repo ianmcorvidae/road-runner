@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gopkg.in/cyverse-de/model.v2"
+	"gopkg.in/cyverse-de/model.v4"
 )
 
 type testFS struct {

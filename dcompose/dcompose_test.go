@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gopkg.in/cyverse-de/model.v2"
+	"gopkg.in/cyverse-de/model.v4"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -62,10 +62,11 @@ var testJob = &model.Job{
 			},
 			Component: model.StepComponent{
 				Container: model.Container{
-					ID:        "container-id-1",
-					Name:      "container-name-1",
-					CPUShares: 0,
-					PIDsLimit: 64,
+					ID:          "container-id-1",
+					Name:        "container-name-1",
+					CPUShares:   0,
+					MaxCPUCores: 2,
+					PIDsLimit:   64,
 					Image: model.ContainerImage{
 						ID:   "container-image-1",
 						Name: "container-image-name-1",
