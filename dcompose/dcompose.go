@@ -29,6 +29,7 @@ const VOLUMEDIR = "workingvolume"
 const TMPDIR = "tmpfiles"
 
 const (
+	// UploadExcludesFilename is the file listing porklock upload exclusions
 	UploadExcludesFilename string = "porklock-upload-exclusions.txt"
 
 	// TypeLabel is the label key applied to every container.
@@ -204,6 +205,7 @@ func (j *JobCompose) InitFromJob(job *model.Job, cfg *viper.Viper, workingdir st
 	j.Services["upload_outputs"] = uploadOutputsSvc
 }
 
+// NewPorklockService generates a docker-compose service for porklock
 func NewPorklockService(containertype int, invocationID, workingVolumeHostPath, porklockImageName string, porklockCommand []string) *Service {
 	return &Service{
 		CapAdd:  []string{"IPC_LOCK"},
